@@ -1,0 +1,156 @@
+{
+  "name": "Checkpoint 1 - Tools Agent y Motor de Razonamiento Base",
+  "nodes": [
+    {
+      "id": "a1b2c3d4-0001-4aaa-9000-000000000001",
+      "name": "Manual Trigger (Prueba de Ejecucion)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 400],
+      "parameters": {}
+    },
+    {
+      "id": "a1b2c3d4-0002-4aaa-9000-000000000002",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [320, 620],
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "PLACEHOLDER_CREDENTIAL_ID",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0003-4aaa-9000-000000000003",
+      "name": "Google Sheets Tool (Workspace)",
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.5,
+      "position": [320, 780],
+      "parameters": {
+        "documentId": {
+          "mode": "list",
+          "value": "PLACEHOLDER_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "mode": "list",
+          "value": "Operaciones_Master"
+        },
+        "operation": "appendOrUpdate",
+        "toolDescription": "Utiliza esta herramienta de Google Sheets EXCLUSIVAMENTE en los siguientes casos de negocio: (1) el usuario solicita consultar el estado actual de un pedido, lead o cliente registrado en la hoja maestra de operaciones comerciales; (2) el usuario pide registrar una nueva solicitud, cotizacion o lead que deba quedar documentado para el seguimiento posterior del equipo comercial; (3) el usuario confirma explicitamente un cambio de estado sobre una fila ya existente (por ejemplo, pasar un pedido de 'pendiente' a 'facturado') y ese cambio debe reflejarse en la planilla; (4) el usuario solicita un resumen o reporte de datos tabulares ya existentes en la hoja para una fecha, cliente o producto especifico. NO debe activarse esta herramienta ante saludos, preguntas generales sobre la empresa, o cuando el dato solicitado ya figura en el historial de la conversacion actual. Si la intencion del usuario es ambigua respecto a si requiere o no acceso a la planilla, el agente debe formular primero una pregunta de clarificacion antes de invocar la herramienta, para evitar ejecutar una accion a partir de una instruccion huerfana o incompleta."
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PLACEHOLDER_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0004-4aaa-9000-000000000004",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [600, 400],
+      "parameters": {
+        "agent": "toolsAgent",
+        "promptType": "define",
+        "text": "={{ $json.chatInput }}",
+        "options": {
+          "systemMessage": "Eres el Agente Virtual de Soporte Comercial de la organizacion. Tu rol es asistir al equipo de ventas y a los clientes en consultas sobre productos, disponibilidad, estados de pedidos y generacion de reportes operativos durante la sesion activa.\n\nObjetivos comerciales de la sesion:\n- Resolver consultas comerciales con precision y en el menor numero de pasos posible.\n- Utilizar las herramientas conectadas unicamente cuando sean estrictamente necesarias para completar la tarea solicitada por el usuario.\n- Mantener un tono profesional, claro y directo en todas las respuestas, priorizando la utilidad para el negocio.\n\nRestricciones explicitas de accion:\n- No debes ejecutar ninguna accion financiera, de facturacion o de modificacion de datos sin confirmacion explicita del usuario.\n- No debes compartir informacion sensible de clientes fuera del contexto de la consulta activa.\n- No debes inventar datos, precios o estados de pedido: si la informacion no esta disponible mediante las herramientas conectadas, debes indicarlo explicitamente en lugar de suponerla.\n- No debes exceder el limite maximo de iteraciones configurado en este agente, ni solicitar o sugerir iteraciones adicionales para sortear dicho limite.\n\nEstilo de redaccion:\n- Redacta siempre en espanol estandar, utilizando concordancia de genero gramatical tradicional (por ejemplo, 'los usuarios', 'los clientes').\n- Queda excluido de forma total el uso de giros de lenguaje inclusivo no normativo (desdoblamientos como 'todos y todas', uso de 'x' o 'e' como marca de genero, u otras variantes equivalentes).",
+          "maxIterations": 7,
+          "returnIntermediateSteps": true
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0005-4aaa-9000-000000000005",
+      "name": "Notificacion de Observabilidad (Slack)",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [900, 400],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "list",
+          "value": "PLACEHOLDER_CHANNEL_ID"
+        },
+        "text": "=Reporte de ejecucion del Tools Agent:\n- Respuesta final: {{ $json.output }}\n- Pasos intermedios ejecutados: {{ $json.intermediateSteps ? $json.intermediateSteps.length : 0 }}\n- Timestamp: {{ $now }}"
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "PLACEHOLDER_CREDENTIAL_ID",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger (Prueba de Ejecucion)": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets Tool (Workspace)": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Notificacion de Observabilidad (Slack)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "checkpoint1-tools-agent-reasoning-engine"
+  },
+  "tags": [],
+  "triggerCount": 1,
+  "active": false,
+  "versionId": "1"
+}
